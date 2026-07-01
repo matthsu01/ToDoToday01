@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今日任務</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --border: #334155;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #6366f1;
+    --accent-light: #818cf8;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --orange: #f97316;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .header .date {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  /* Editable Title */
+  .editable-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .editable-title h1 {
+    cursor: pointer;
+    outline: none;
+    border-radius: 8px;
+    padding: 2px 8px;
+    transition: background 0.2s;
+  }
+  .editable-title h1:hover { background: rgba(99,102,241,0.1); }
+  .editable-title h1:focus { background: rgba(99,102,241,0.15); box-shadow: 0 0 0 2px var(--accent); }
+  .edit-icon {
+    font-size: 16px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .edit-icon:hover { color: var(--accent-light); }
+
+  /* Sync Status */
+  .sync-status {
+    font-size: 11px;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .sync-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    display: inline-block;
+  }
+  .sync-dot.offline { background: var(--red); }
+
+  /* Live Clock */
+  .live-clock {
+    font-size: 28px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-light);
+    letter-spacing: 2px;
+    line-height: 1.2;
+  }
+
+  .live-clock .seconds {
+    font-size: 20px;
+    color: var(--muted);
+  }
+
+  /* Assignee clickable */
+  .assignee {
+    cursor: pointer;
+    transition: opacity 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .assignee:hover { opacity: 0.8; }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.show { display: flex; }
+
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 520px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-header h2 {
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .modal-close:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+
+  .modal-stat-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .modal-stat {
+    flex: 1;
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .modal-stat .num {
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  .modal-stat .label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .modal-task-item {
+    background: rgba(0,0,0,0.15);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+
+  .modal-task-item .task-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .modal-task-item .task-name {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .modal-task-item .task-time {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* Stats Cards */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    transition: transform 0.2s;
+  }
+
+  .stat-card:hover { transform: translateY(-3px); }
+
+  .stat-card .num {
+    font-size: 36px;
+    font-weight: 800;
+    margin-bottom: 4px;
+  }
+
+  .stat-card .label {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .stat-card.total .num { color: var(--accent-light); }
+  .stat-card.done .num { color: var(--green); }
+  .stat-card.pending .num { color: var(--yellow); }
+  .stat-card.overdue .num { color: var(--red); }
+
+  /* Add Form */
+  .add-form {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+
+  .add-form h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+    gap: 10px;
+    align-items: end;
+  }
+
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+
+  .form-group label {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  input, select, textarea {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+  }
+
+  .btn-add {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+    height: 40px;
+  }
+
+  .btn-add:hover { background: var(--accent-light); }
+
+  .btn-mini {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--accent-light);
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: 700;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .btn-mini:hover { border-color: var(--accent); background: var(--accent); color: white; }
+
+  /* Manage Options Modal */
+  .manage-options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .manage-option-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+  .manage-option-row .name {
+    flex: 1;
+    font-size: 14px;
+    cursor: pointer;
+    outline: none;
+    border-radius: 4px;
+    padding: 2px 6px;
+    transition: background 0.2s;
+  }
+  .manage-option-row .name:hover { background: rgba(99,102,241,0.15); }
+  .manage-option-row .name:focus { background: rgba(99,102,241,0.2); box-shadow: 0 0 0 2px var(--accent); }
+
+  .btn-edit {
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(99,102,241,0.3);
+    color: var(--accent-light);
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .btn-edit:hover { background: var(--accent); color: white; }
+  .manage-option-row .badge-default {
+    font-size: 10px;
+    color: var(--muted);
+    background: rgba(255,255,255,0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .btn-remove {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: var(--red);
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .btn-remove:hover { background: var(--red); color: white; }
+  .btn-remove:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+  .manage-add-row {
+    display: flex;
+    gap: 8px;
+  }
+  .manage-add-row input {
+    flex: 1;
+  }
+
+  /* Bar chart clickable */
+  .bar-item { cursor: pointer; transition: opacity 0.2s; }
+  .bar-item:hover { opacity: 0.85; }
+  .bar-item .bar-label { cursor: pointer; }
+
+  /* Filter Bar */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .filter-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  /* Table */
+  .table-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th {
+    text-align: left;
+    padding: 12px 16px;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.15);
+  }
+
+  td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  tr:hover { background: rgba(99,102,241,0.05); }
+
+  .task-title { font-weight: 500; }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .badge-todo { background: rgba(234,179,8,0.15); color: var(--yellow); }
+  .badge-progress { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .badge-done { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-overdue { background: rgba(239,68,68,0.15); color: var(--red); }
+
+  .avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .action-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .action-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .action-btn.delete:hover { border-color: var(--red); color: var(--red); }
+
+  /* Charts */
+  .charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .chart-card h3 {
+    font-size: 15px;
+    margin-bottom: 16px;
+    color: var(--muted);
+  }
+
+  /* Bar Chart */
+  .bar-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .bar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .bar-label {
+    width: 80px;
+    font-size: 13px;
+    color: var(--muted);
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 24px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.5s ease;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+  }
+
+  /* Donut Chart */
+  .donut-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+  }
+
+  .donut-chart {
+    position: relative;
+    width: 160px;
+    height: 160px;
+  }
+
+  .donut-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+
+  .donut-center .big {
+    font-size: 32px;
+    font-weight: 800;
+  }
+
+  .donut-center .small {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .donut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  /* Timeline */
+  .timeline-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .timeline-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+
+  .timeline-time {
+    width: 50px;
+    color: var(--muted);
+    flex-shrink: 0;
+    text-align: right;
+  }
+
+  .timeline-bar {
+    flex: 1;
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Empty State */
+  .empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .form-row { grid-template-columns: 1fr 1fr; }
+    .charts { grid-template-columns: 1fr; }
+    .donut-wrap { flex-direction: column; }
+    th:nth-child(3), td:nth-child(3) { display: none; }
+  }
+
+  @media (max-width: 480px) {
+    .form-row { grid-template-columns: 1fr; }
+    th:nth-child(4), td:nth-child(4) { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="editable-title">
+        <h1 id="pageTitle" contenteditable="true" spellcheck="false" onblur="saveTitle()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" title="點擊編輯標題">📋 今日任務</h1>
+        <span class="edit-icon" onclick="document.getElementById('pageTitle').focus()">✏️</span>
+      </div>
+      <div class="date" id="todayDate"></div>
+      <div class="live-clock" id="liveClock"></div>
+      <div class="sync-status" id="syncStatus"><span class="sync-dot"></span> 已同步</div>
+    </div>
+    <button class="btn-add" onclick="toggleAddForm()">+ 新增任務</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats" id="stats"></div>
+
+  <!-- Add Form -->
+  <div class="add-form" id="addForm" style="display:none;">
+    <h2>✨ 新增任務事項</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>任務內容</label>
+        <div style="display:flex;gap:6px;">
+          <select id="taskInput" style="flex:1"></select>
+          <button type="button" class="btn-mini" onclick="openManageOptions('taskOptions','任務內容')" title="管理任務選項">⚙</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>責任人</label>
+        <div style="display:flex;gap:6px;">
+          <select id="ownerInput" style="flex:1"></select>
+          <button type="button" class="btn-mini" onclick="openManageOptions('ownerOptions','責任人')" title="管理責任人選項">⚙</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>執行時間</label>
+        <div style="display:flex;gap:6px;">
+          <select id="startYear" style="width:80px" onchange="updateDays('start')"></select>
+          <select id="startMonth" style="width:60px" onchange="updateDays('start')"></select>
+          <select id="startDay" style="width:60px"></select>
+          <select id="startHour" style="width:60px"></select>
+          <select id="startMin" style="width:60px"></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>完成期限</label>
+        <div style="display:flex;gap:6px;">
+          <select id="deadlineYear" style="width:80px" onchange="updateDays('deadline')"></select>
+          <select id="deadlineMonth" style="width:60px" onchange="updateDays('deadline')"></select>
+          <select id="deadlineDay" style="width:60px"></select>
+          <select id="deadlineHour" style="width:60px"></select>
+          <select id="deadlineMin" style="width:60px"></select>
+        </div>
+      </div>
+      <button class="btn-add" onclick="addTask()">新增</button>
+    </div>
+  </div>
+
+  <!-- Assignee Detail Modal -->
+  <div class="modal-overlay" id="assigneeModal" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle"></h2>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-stat-row" id="modalStats"></div>
+      <div id="modalTaskList"></div>
+    </div>
+  </div>
+
+  <!-- Manage Options Modal -->
+  <div class="modal-overlay" id="manageModal" onclick="if(event.target===this)closeManageModal()">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="manageModalTitle"></h2>
+        <button class="modal-close" onclick="closeManageModal()">✕</button>
+      </div>
+      <div class="manage-options-list" id="manageOptionsList"></div>
+      <div class="manage-add-row">
+        <input type="text" id="manageNewInput" placeholder="輸入新選項..." onkeydown="if(event.key==='Enter')confirmAddManageOption()">
+        <button class="btn-add" onclick="confirmAddManageOption()">新增</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="setFilter('all', this)">全部</button>
+    <button class="filter-btn" onclick="setFilter('todo', this)">待辦</button>
+    <button class="filter-btn" onclick="setFilter('progress', this)">進行中</button>
+    <button class="filter-btn" onclick="setFilter('done', this)">已完成</button>
+    <button class="filter-btn" onclick="setFilter('overdue', this)">逾期</button>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>任務</th><th>責任人</th><th>執行時間</th><th>完成期限</th><th>狀態</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="taskBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts">
+    <div class="chart-card">
+      <h3>📊 任務狀態分佈</h3>
+      <div class="donut-wrap">
+        <div class="donut-chart">
+          <svg width="160" height="160" viewBox="0 0 160 160" id="donutSvg"></svg>
+          <div class="donut-center">
+            <div class="big" id="donutTotal">0</div>
+            <div class="small">總任務數</div>
+          </div>
+        </div>
+        <div class="donut-legend" id="donutLegend"></div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>👤 責任人任務量</h3>
+      <div class="bar-chart" id="assigneeChart"></div>
+    </div>
+    <div class="chart-card" style="grid-column: 1 / -1;">
+      <h3>⏰ 今日執行時間軸</h3>
+      <div class="timeline-chart" id="timelineChart"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---- API Layer ----
+  // Detect API base URL: same host, port 18800
+  const API_BASE = location.protocol + '//' + location.hostname + ':18800';
+
+  async function apiGet(path) {
+    try {
+      const r = await fetch(`${API_BASE}/api/${path}`);
+      if (!r.ok) throw new Error(r.status);
+      return await r.json();
+    } catch(e) {
+      setSyncStatus(false);
+      return null;
+    }
+  }
+
+  async function apiPost(path, data) {
+    try {
+      const r = await fetch(`${API_BASE}/api/${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!r.ok) throw new Error(r.status);
+      setSyncStatus(true);
+      return await r.json();
+    } catch(e) {
+      setSyncStatus(false);
+      return null;
+    }
+  }
+
+  function setSyncStatus(online) {
+    const el = document.getElementById('syncStatus');
+    if (online) {
+      el.innerHTML = '<span class="sync-dot"></span> 已同步';
+    } else {
+      el.innerHTML = '<span class="sync-dot offline"></span> 連線中斷';
+    }
+  }
+
+  // ---- State ----
+  let tasks = [];
+  let optionsData = { taskOptions: [], ownerOptions: [] };
+  let titleData = { title: '📋 今日任務' };
+  let currentFilter = 'all';
+  let manageState = { storageKey: null, label: '' };
+
+  const avatarColors = ['#6366f1','#3b82f6','#22c55e','#eab308','#f97316','#ef4444','#ec4899','#14b8a6'];
+  function avatarColor(name) {
+    let hash = 0;
+    for (let c of (name || '?')) hash = c.charCodeAt(0) + ((hash << 5) - hash);
+    return avatarColors[Math.abs(hash) % avatarColors.length];
+  }
+  function initials(name) { return (name || '?').slice(0, 2).toUpperCase(); }
+
+  function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s || '';
+    return div.innerHTML;
+  }
+
+  // ---- Status Logic ----
+  function getStatus(task) {
+    if (task.status === 'done') return 'done';
+    const now = new Date();
+    const deadline = task.deadline ? new Date(task.deadline) : null;
+    if (deadline && now > deadline) return 'overdue';
+    if (task.status === 'progress') return 'progress';
+    return 'todo';
+  }
+
+  function statusBadge(status) {
+    const map = {
+      todo: { cls: 'badge-todo', text: '待辦' },
+      progress: { cls: 'badge-progress', text: '進行中' },
+      done: { cls: 'badge-done', text: '已完成' },
+      overdue: { cls: 'badge-overdue', text: '逾期' }
+    };
+    const s = map[status] || map.todo;
+    return `<span class="badge ${s.cls}">${s.text}</span>`;
+  }
+
+  function fmtDate(dt) {
+    if (!dt) return '<span style="color:var(--muted)">—</span>';
+    const d = new Date(dt);
+    return d.toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ---- Live Clock ----
+  function updateClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const s = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('liveClock').innerHTML = `${h}:${m}<span class="seconds">:${s}</span>`;
+  }
+
+  // ---- Toggle Add Form ----
+  function toggleAddForm() {
+    const f = document.getElementById('addForm');
+    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  }
+
+  // ---- Title ----
+  async function saveTitle() {
+    const title = document.getElementById('pageTitle').textContent.trim();
+    titleData.title = title;
+    document.title = title;
+    await apiPost('title', { title });
+  }
+
+  // ---- Data Sync ----
+  async function fetchAll() {
+    const [t, o, ti] = await Promise.all([
+      apiGet('tasks'),
+      apiGet('options'),
+      apiGet('title')
+    ]);
+    if (t !== null) tasks = t;
+    if (o !== null) optionsData = o;
+    if (ti !== null) {
+      titleData = ti;
+      document.getElementById('pageTitle').textContent = ti.title;
+      document.title = ti.title;
+    }
+  }
+
+  async function saveTasks() {
+    await apiPost('tasks', tasks);
+  }
+
+  async function saveOptions() {
+    await apiPost('options', optionsData);
+  }
+
+  // ---- Manage Options ----
+  function openManageOptions(storageKey, label) {
+    manageState = { storageKey, label };
+    document.getElementById('manageModalTitle').textContent = `⚙ 管理${label}選項`;
+    document.getElementById('manageNewInput').value = '';
+    renderManageOptions();
+    document.getElementById('manageModal').classList.add('show');
+    setTimeout(() => document.getElementById('manageNewInput').focus(), 100);
+  }
+
+  function closeManageModal() {
+    document.getElementById('manageModal').classList.remove('show');
+  }
+
+  function getManageList() {
+    return optionsData[manageState.storageKey] || [];
+  }
+
+  function renderManageOptions() {
+    const all = getManageList();
+    const container = document.getElementById('manageOptionsList');
+    if (all.length === 0) {
+      container.innerHTML = '<div class="empty">無選項，可在下方新增</div>';
+      return;
+    }
+    container.innerHTML = all.map((name, idx) => {
+      const inUseCount = getOptionUsageCount(name);
+      return `
+        <div class="manage-option-row">
+          <span class="name" contenteditable="true" spellcheck="false"
+            id="edit-${idx}"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();saveEditOption(${idx},this.textContent)}"
+            onblur="saveEditOption(${idx},this.textContent)"
+            title="點擊編輯">${escapeHtml(name)}</span>
+          ${inUseCount > 0 ? `<span class="badge-default" style="color:var(--yellow)">使用中(${inUseCount})</span>` : ''}
+          <button class="btn-edit" onclick="document.getElementById('edit-${idx}').focus()" title="編輯名稱">✏</button>
+          <button class="btn-remove" onclick="removeManageOption(${idx})" title="移除">✕</button>
+        </div>`;
+    }).join('');
+  }
+
+  function getOptionUsageCount(name) {
+    if (manageState.storageKey === 'taskOptions') {
+      return tasks.filter(t => t.title === name).length;
+    } else {
+      return tasks.filter(t => t.owner === name).length;
+    }
+  }
+
+  async function saveEditOption(idx, newVal) {
+    newVal = (newVal || '').trim();
+    if (!newVal) { renderManageOptions(); return; }
+    const all = getManageList();
+    const oldVal = all[idx];
+    if (newVal === oldVal) return;
+    if (all.includes(newVal)) {
+      alert(`「${newVal}」已存在`);
+      renderManageOptions();
+      return;
+    }
+    all[idx] = newVal;
+    optionsData[manageState.storageKey] = all;
+    // Update tasks
+    if (manageState.storageKey === 'taskOptions') {
+      tasks.forEach(t => { if (t.title === oldVal) t.title = newVal; });
+    } else {
+      tasks.forEach(t => { if (t.owner === oldVal) t.owner = newVal; });
+    }
+    await Promise.all([saveOptions(), saveTasks()]);
+    rebuildSelects();
+    renderManageOptions();
+    renderAll();
+  }
+
+  async function confirmAddManageOption() {
+    const input = document.getElementById('manageNewInput');
+    const val = input.value.trim();
+    if (!val) return;
+    const all = getManageList();
+    if (all.includes(val)) { input.value = ''; return; }
+    all.push(val);
+    optionsData[manageState.storageKey] = all;
+    await saveOptions();
+    rebuildSelects();
+    input.value = '';
+    renderManageOptions();
+  }
+
+  async function removeManageOption(idx) {
+    const all = getManageList();
+    const name = all[idx];
+    const inUseCount = getOptionUsageCount(name);
+    if (inUseCount > 0) {
+      if (!confirm(`「${name}」正在 ${inUseCount} 個任務中使用，確定要移除嗎？\n（已使用的任務不受影響，但之後無法再選此選項）`)) return;
+    }
+    all.splice(idx, 1);
+    optionsData[manageState.storageKey] = all;
+    await saveOptions();
+    rebuildSelects();
+    renderManageOptions();
+  }
+
+  function rebuildSelects() {
+    rebuildSelectById('taskInput', optionsData.taskOptions, '-- 選擇任務 --');
+    rebuildSelectById('ownerInput', optionsData.ownerOptions, '-- 選擇 --');
+  }
+
+  function rebuildSelectById(selectId, list, placeholder) {
+    const sel = document.getElementById(selectId);
+    const currentVal = sel.value;
+    sel.innerHTML = `<option value="">${placeholder}</option>`;
+    (list || []).forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      sel.appendChild(opt);
+    });
+    if (currentVal && (list || []).includes(currentVal)) sel.value = currentVal;
+  }
+
+  // ---- Assignee Modal ----
+  function showAssigneeDetail(owner) {
+    if (!owner) return;
+    const ownerTasks = tasks.filter(t => t.owner === owner);
+    const done = ownerTasks.filter(t => getStatus(t) === 'done').length;
+    const progress = ownerTasks.filter(t => getStatus(t) === 'progress').length;
+    const todo = ownerTasks.filter(t => getStatus(t) === 'todo').length;
+    const overdue = ownerTasks.filter(t => getStatus(t) === 'overdue').length;
+    const color = avatarColor(owner);
+
+    document.getElementById('modalTitle').innerHTML =
+      `<div class="avatar" style="background:${color};width:36px;height:36px;font-size:14px">${initials(owner)}</div> ${escapeHtml(owner)}`;
+
+    document.getElementById('modalStats').innerHTML = `
+      <div class="modal-stat"><div class="num" style="color:var(--accent-light)">${ownerTasks.length}</div><div class="label">總任務</div></div>
+      <div class="modal-stat"><div class="num" style="color:var(--yellow)">${todo}</div><div class="label">待辦</div></div>
+      <div class="modal-stat"><div class="num" style="color:var(--blue)">${progress}</div><div class="label">進行中</div></div>
+      <div class="modal-stat"><div class="num" style="color:var(--green)">${done}</div><div class="label">已完成</div></div>
+      <div class="modal-stat"><div class="num" style="color:var(--red)">${overdue}</div><div class="label">逾期</div></div>`;
+
+    if (ownerTasks.length === 0) {
+      document.getElementById('modalTaskList').innerHTML = '<div class="empty">此人目前沒有任務</div>';
+    } else {
+      const statusText = { todo: '待辦', progress: '進行中', done: '已完成', overdue: '逾期' };
+      document.getElementById('modalTaskList').innerHTML = ownerTasks.map(t => {
+        const st = getStatus(t);
+        return `<div class="modal-task-item">
+          <div class="task-row">
+            <span class="task-name">${escapeHtml(t.title)}</span>
+            <span class="badge badge-${st}">${statusText[st]}</span>
+          </div>
+          <div class="task-time">
+            執行: ${t.start ? new Date(t.start).toLocaleString('zh-TW', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}
+            　|　期限: ${t.deadline ? new Date(t.deadline).toLocaleString('zh-TW', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}
+          </div></div>`;
+      }).join('');
+    }
+    document.getElementById('assigneeModal').classList.add('show');
+  }
+
+  function closeModal() { document.getElementById('assigneeModal').classList.remove('show'); }
+
+  // ---- Render ----
+  function renderAll() {
+    renderStats(); renderTable(); renderDonut(); renderAssigneeChart(); renderTimeline();
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('taskBody');
+    let filtered = tasks;
+    if (currentFilter !== 'all') filtered = tasks.filter(t => getStatus(t) === currentFilter);
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">🎉 沒有任務，新增一個吧！</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map(t => {
+      const status = getStatus(t);
+      const idx = tasks.indexOf(t);
+      const color = avatarColor(t.owner);
+      return `<tr>
+        <td class="task-title">${escapeHtml(t.title)}</td>
+        <td><div class="assignee" onclick="showAssigneeDetail('${escapeHtml(t.owner)}')" title="點擊查看任務詳情">
+          <div class="avatar" style="background:${color}">${initials(t.owner)}</div>
+          ${escapeHtml(t.owner)}
+        </div></td>
+        <td>${fmtDate(t.start)}</td>
+        <td>${fmtDate(t.deadline)}</td>
+        <td>${statusBadge(status)}</td>
+        <td>
+          <button class="action-btn" onclick="cycleStatus(${idx})" title="切換狀態">✓</button>
+          <button class="action-btn delete" onclick="deleteTask(${idx})" title="刪除">✕</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  function renderStats() {
+    const c = { total: tasks.length, todo: 0, progress: 0, done: 0, overdue: 0 };
+    tasks.forEach(t => { c[getStatus(t)]++; });
+    document.getElementById('stats').innerHTML = `
+      <div class="stat-card total"><div class="num">${c.total}</div><div class="label">總任務</div></div>
+      <div class="stat-card pending"><div class="num">${c.todo}</div><div class="label">待辦</div></div>
+      <div class="stat-card"><div class="num" style="color:var(--blue)">${c.progress}</div><div class="label">進行中</div></div>
+      <div class="stat-card done"><div class="num">${c.done}</div><div class="label">已完成</div></div>
+      <div class="stat-card overdue"><div class="num">${c.overdue}</div><div class="label">逾期</div></div>`;
+  }
+
+  function renderDonut() {
+    const c = { todo: 0, progress: 0, done: 0, overdue: 0 };
+    tasks.forEach(t => { c[getStatus(t)]++; });
+    const total = tasks.length;
+    document.getElementById('donutTotal').textContent = total;
+    const segments = [
+      { label: '待辦', value: c.todo, color: '#eab308' },
+      { label: '進行中', value: c.progress, color: '#3b82f6' },
+      { label: '已完成', value: c.done, color: '#22c55e' },
+      { label: '逾期', value: c.overdue, color: '#ef4444' }
+    ];
+    const svg = document.getElementById('donutSvg');
+    const legend = document.getElementById('donutLegend');
+    let html = '', legendHtml = '';
+    if (total === 0) {
+      html = '<circle cx="80" cy="80" r="60" fill="none" stroke="#334155" stroke-width="20"/>';
+      legendHtml = '<div class="legend-item"><div class="legend-dot" style="background:#334155"></div>無資料</div>';
+    } else {
+      const radius = 60, circ = 2 * Math.PI * radius;
+      let offset = 0;
+      segments.forEach(seg => {
+        if (seg.value === 0) return;
+        const pct = seg.value / total;
+        const dash = pct * circ, gap = circ - dash;
+        const rotate = (offset / total) * 360 - 90;
+        html += `<circle cx="80" cy="80" r="${radius}" fill="none" stroke="${seg.color}" stroke-width="20" stroke-dasharray="${dash} ${gap}" stroke-dashoffset="${-offset / total * circ}" transform="rotate(${rotate} 80 80)"/>`;
+        offset += seg.value;
+      });
+      legendHtml = segments.filter(s => s.value > 0).map(s => `<div class="legend-item"><div class="legend-dot" style="background:${s.color}"></div>${s.label} (${s.value})</div>`).join('');
+    }
+    svg.innerHTML = html;
+    legend.innerHTML = legendHtml;
+  }
+
+  function renderAssigneeChart() {
+    const map = {};
+    tasks.forEach(t => {
+      const name = t.owner || '未指派';
+      if (!map[name]) map[name] = { total: 0, done: 0 };
+      map[name].total++;
+      if (getStatus(t) === 'done') map[name].done++;
+    });
+    const entries = Object.entries(map).sort((a, b) => b[1].total - a[1].total);
+    const maxVal = Math.max(...entries.map(e => e[1].total), 1);
+    const container = document.getElementById('assigneeChart');
+    if (entries.length === 0) { container.innerHTML = '<div class="empty">無資料</div>'; return; }
+    container.innerHTML = entries.map(([name, data]) => {
+      const pct = (data.total / maxVal) * 100;
+      const color = avatarColor(name);
+      return `<div class="bar-item" onclick="showAssigneeDetail('${escapeHtml(name)}')" title="點擊查看${escapeHtml(name)}的任務詳情">
+        <div class="bar-label">${escapeHtml(name)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${color}">${data.total} (${data.done}✓)</div></div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderTimeline() {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    const todayTasks = tasks.filter(t => {
+      if (!t.start) return false;
+      const s = new Date(t.start);
+      return s >= today && s < tomorrow;
+    }).sort((a, b) => new Date(a.start) - new Date(b.start));
+    const container = document.getElementById('timelineChart');
+    if (todayTasks.length === 0) { container.innerHTML = '<div class="empty">今日無排程任務</div>'; return; }
+    const colors = { todo: '#eab308', progress: '#3b82f6', done: '#22c55e', overdue: '#ef4444' };
+    container.innerHTML = todayTasks.map(t => {
+      const st = getStatus(t);
+      const s = new Date(t.start);
+      const timeStr = s.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+      const endStr = t.deadline ? new Date(t.deadline).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '';
+      const label = `${escapeHtml(t.title)} — ${escapeHtml(t.owner || '')}`;
+      return `<div class="timeline-item"><div class="timeline-time">${timeStr}</div><div class="timeline-bar" style="background:${colors[st]}">${label}${endStr ? ' → ' + endStr : ''}</div></div>`;
+    }).join('');
+  }
+
+  // ---- Actions ----
+  function buildDateStr(prefix) {
+    const y = document.getElementById(prefix + 'Year').value;
+    const m = document.getElementById(prefix + 'Month').value;
+    const d = document.getElementById(prefix + 'Day').value;
+    const h = document.getElementById(prefix + 'Hour').value;
+    const min = document.getElementById(prefix + 'Min').value;
+    if (!y || !m || !d) return '';
+    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}T${String(h||'0').padStart(2,'0')}:${String(min||'0').padStart(2,'0')}`;
+  }
+
+  async function addTask() {
+    const title = document.getElementById('taskInput').value.trim();
+    const owner = document.getElementById('ownerInput').value.trim();
+    const start = buildDateStr('start');
+    const deadline = buildDateStr('deadline');
+    if (!title) { alert('請選擇任務內容'); return; }
+    tasks.push({ title, owner, start, deadline, status: 'todo', created: new Date().toISOString() });
+    await saveTasks();
+    renderAll();
+    document.getElementById('taskInput').value = '';
+    document.getElementById('ownerInput').value = '';
+    resetDateSelects();
+  }
+
+  async function deleteTask(idx) {
+    tasks.splice(idx, 1);
+    await saveTasks();
+    renderAll();
+  }
+
+  async function cycleStatus(idx) {
+    const t = tasks[idx];
+    const cycle = ['todo', 'progress', 'done'];
+    t.status = cycle[(cycle.indexOf(t.status) + 1) % cycle.length];
+    await saveTasks();
+    renderAll();
+  }
+
+  function setFilter(filter, btn) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable();
+  }
+
+  // ---- Date Dropdowns ----
+  function initDateSelects() {
+    const curYear = new Date().getFullYear();
+    ['start','deadline'].forEach(prefix => {
+      const yearSel = document.getElementById(prefix + 'Year');
+      for (let y = 2024; y <= curYear + 1; y++) { const o = document.createElement('option'); o.value = y; o.textContent = y + '年'; yearSel.appendChild(o); }
+      yearSel.value = 2026;
+      const monthSel = document.getElementById(prefix + 'Month');
+      for (let m = 1; m <= 12; m++) { const o = document.createElement('option'); o.value = m; o.textContent = m + '月'; monthSel.appendChild(o); }
+      monthSel.value = 7;
+    });
+    updateDays('start'); updateDays('deadline');
+    ['start','deadline'].forEach(prefix => {
+      const hourSel = document.getElementById(prefix + 'Hour');
+      for (let h = 0; h <= 23; h++) { const o = document.createElement('option'); o.value = h; o.textContent = String(h).padStart(2,'0') + '時'; hourSel.appendChild(o); }
+      const minSel = document.getElementById(prefix + 'Min');
+      for (let mm = 0; mm <= 59; mm += 5) { const o = document.createElement('option'); o.value = mm; o.textContent = String(mm).padStart(2,'0') + '分'; minSel.appendChild(o); }
+    });
+    document.getElementById('startHour').value = 9;
+    document.getElementById('startMin').value = 0;
+    document.getElementById('deadlineHour').value = 10;
+    document.getElementById('deadlineMin').value = 0;
+  }
+
+  function updateDays(prefix) {
+    const y = parseInt(document.getElementById(prefix + 'Year').value) || 2026;
+    const m = parseInt(document.getElementById(prefix + 'Month').value) || 7;
+    const dim = new Date(y, m, 0).getDate();
+    const daySel = document.getElementById(prefix + 'Day');
+    const prev = daySel.value;
+    daySel.innerHTML = '';
+    for (let d = 1; d <= dim; d++) { const o = document.createElement('option'); o.value = d; o.textContent = d + '日'; daySel.appendChild(o); }
+    daySel.value = (prev && prev <= dim) ? prev : 1;
+  }
+
+  function resetDateSelects() {
+    ['start','deadline'].forEach(prefix => {
+      document.getElementById(prefix + 'Year').value = 2026;
+      document.getElementById(prefix + 'Month').value = 7;
+    });
+    updateDays('start'); updateDays('deadline');
+    document.getElementById('startHour').value = 9;
+    document.getElementById('startMin').value = 0;
+    document.getElementById('deadlineHour').value = 10;
+    document.getElementById('deadlineMin').value = 0;
+  }
+
+  // ---- Init ----
+  async function init() {
+    const today = new Date();
+    document.getElementById('todayDate').textContent =
+      today.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+
+    initDateSelects();
+
+    // Fetch data from server
+    await fetchAll();
+
+    // Seed demo data if server is empty AND this is the first run
+    if (tasks.length === 0) {
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      tasks = [
+        { title: '背單字', owner: '辰辰', start: `${todayStr}T09:00`, deadline: `${todayStr}T09:30`, status: 'done', created: now.toISOString() },
+        { title: '看課外書', owner: '小希', start: `${todayStr}T10:00`, deadline: `${todayStr}T12:00`, status: 'progress', created: now.toISOString() },
+        { title: '念數學', owner: '萌萌', start: `${todayStr}T14:00`, deadline: `${todayStr}T15:30`, status: 'todo', created: now.toISOString() },
+        { title: '背單字', owner: '小希', start: `${todayStr}T15:00`, deadline: `${todayStr}T16:00`, status: 'todo', created: now.toISOString() },
+        { title: '練管樂', owner: '辰辰', start: `${todayStr}T16:30`, deadline: `${todayStr}T17:30`, status: 'todo', created: now.toISOString() },
+        { title: '念數學', owner: '萌萌', start: `${todayStr}T09:00`, deadline: `${todayStr}T18:00`, status: 'todo', created: now.toISOString() }
+      ];
+      await saveTasks();
+    }
+
+    rebuildSelects();
+    renderAll();
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // Poll for updates every 5 seconds (multi-user sync)
+    setInterval(async () => {
+      const prevLen = tasks.length;
+      const prevTitle = titleData.title;
+      await fetchAll();
+      // Only re-render if something changed
+      if (tasks.length !== prevLen || document.getElementById('pageTitle').textContent.trim() !== titleData.title) {
+        rebuildSelects();
+        renderAll();
+      } else {
+        // Check if any task content changed
+        renderAll();
+      }
+    }, 5000);
+  }
+
+  init();
+</script>
+</body>
+</html>
