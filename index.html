@@ -839,19 +839,34 @@
 </div>
 
 <script>
-  // ---- API Layer ----
-  // Detect API base URL: same host, port 18800
+  // ---- Hybrid Storage Layer ----
+  // Tries API server first, falls back to localStorage
+  // This works on GitHub Pages (localStorage) and on self-hosted (API sync)
   const API_BASE = location.protocol + '//' + location.hostname + ':18800';
+  const LS_TASKS = 'todo_tasks';
+  const LS_OPTIONS = 'todo_options';
+  const LS_TITLE = 'todo_title';
+
+  const SEED_TASKS = ['背單字','看課外書','念數學','練管樂'];
+  const SEED_OWNERS = ['辰辰','小希','萌萌'];
+
+  let useServer = false; // auto-detected on init
+
+  async function detectServer() {
+    try {
+      const r = await fetch(`${API_BASE}/api/tasks`, { method: 'GET' });
+      if (r.ok) { useServer = true; return true; }
+    } catch(e) {}
+    useServer = false;
+    return false;
+  }
 
   async function apiGet(path) {
     try {
       const r = await fetch(`${API_BASE}/api/${path}`);
       if (!r.ok) throw new Error(r.status);
       return await r.json();
-    } catch(e) {
-      setSyncStatus(false);
-      return null;
-    }
+    } catch(e) { return null; }
   }
 
   async function apiPost(path, data) {
@@ -862,20 +877,41 @@
         body: JSON.stringify(data)
       });
       if (!r.ok) throw new Error(r.status);
-      setSyncStatus(true);
       return await r.json();
-    } catch(e) {
-      setSyncStatus(false);
-      return null;
+    } catch(e) { return null; }
+  }
+
+  // LocalStorage helpers
+  function lsGet(key, fallback) {
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+    catch(e) { return fallback; }
+  }
+  function lsSet(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+  }
+
+  // Unified read/write
+  async function fetchData(path, lsKey, fallback) {
+    if (useServer) {
+      const r = await apiGet(path);
+      if (r !== null) return r;
+    }
+    return lsGet(lsKey, fallback);
+  }
+
+  async function saveData(path, lsKey, data) {
+    lsSet(lsKey, data); // always save locally as backup
+    if (useServer) {
+      await apiPost(path, data);
     }
   }
 
-  function setSyncStatus(online) {
+  function setSyncStatus() {
     const el = document.getElementById('syncStatus');
-    if (online) {
-      el.innerHTML = '<span class="sync-dot"></span> 已同步';
+    if (useServer) {
+      el.innerHTML = '<span class="sync-dot"></span> 多人同步';
     } else {
-      el.innerHTML = '<span class="sync-dot offline"></span> 連線中斷';
+      el.innerHTML = '<span class="sync-dot offline"></span> 本機模式';
     }
   }
 
@@ -947,31 +983,37 @@
     const title = document.getElementById('pageTitle').textContent.trim();
     titleData.title = title;
     document.title = title;
-    await apiPost('title', { title });
+    await saveTitleData();
   }
 
   // ---- Data Sync ----
   async function fetchAll() {
     const [t, o, ti] = await Promise.all([
-      apiGet('tasks'),
-      apiGet('options'),
-      apiGet('title')
+      fetchData('tasks', LS_TASKS, []),
+      fetchData('options', LS_OPTIONS, { taskOptions: SEED_TASKS, ownerOptions: SEED_OWNERS }),
+      fetchData('title', LS_TITLE, { title: '📋 今日任務' })
     ]);
-    if (t !== null) tasks = t;
-    if (o !== null) optionsData = o;
-    if (ti !== null) {
-      titleData = ti;
-      document.getElementById('pageTitle').textContent = ti.title;
-      document.title = ti.title;
+    tasks = t || [];
+    optionsData = o || { taskOptions: SEED_TASKS, ownerOptions: SEED_OWNERS };
+    titleData = ti || { title: '📋 今日任務' };
+    // Update title in UI
+    const titleEl = document.getElementById('pageTitle');
+    if (titleEl.textContent.trim() !== titleData.title) {
+      titleEl.textContent = titleData.title;
+      document.title = titleData.title;
     }
   }
 
   async function saveTasks() {
-    await apiPost('tasks', tasks);
+    await saveData('tasks', LS_TASKS, tasks);
   }
 
   async function saveOptions() {
-    await apiPost('options', optionsData);
+    await saveData('options', LS_OPTIONS, optionsData);
+  }
+
+  async function saveTitleData() {
+    await saveData('title', LS_TITLE, titleData);
   }
 
   // ---- Manage Options ----
@@ -1358,10 +1400,14 @@
 
     initDateSelects();
 
-    // Fetch data from server
+    // Detect if API server is available
+    await detectServer();
+    setSyncStatus();
+
+    // Fetch data (from server or localStorage)
     await fetchAll();
 
-    // Seed demo data if server is empty AND this is the first run
+    // Seed demo data if first run
     if (tasks.length === 0) {
       const now = new Date();
       const todayStr = now.toISOString().slice(0, 10);
@@ -1381,20 +1427,21 @@
     updateClock();
     setInterval(updateClock, 1000);
 
-    // Poll for updates every 5 seconds (multi-user sync)
-    setInterval(async () => {
-      const prevLen = tasks.length;
-      const prevTitle = titleData.title;
-      await fetchAll();
-      // Only re-render if something changed
-      if (tasks.length !== prevLen || document.getElementById('pageTitle').textContent.trim() !== titleData.title) {
-        rebuildSelects();
-        renderAll();
-      } else {
-        // Check if any task content changed
-        renderAll();
-      }
-    }, 5000);
+    // Poll for updates (only useful in server mode)
+    if (useServer) {
+      setInterval(async () => {
+        const prevLen = tasks.length;
+        const prevTitle = titleData.title;
+        const prevOpts = JSON.stringify(optionsData);
+        await fetchAll();
+        if (tasks.length !== prevLen || prevTitle !== titleData.title || prevOpts !== JSON.stringify(optionsData)) {
+          rebuildSelects();
+          renderAll();
+        } else {
+          renderAll(); // re-render for status changes (overdue detection)
+        }
+      }, 5000);
+    }
   }
 
   init();
